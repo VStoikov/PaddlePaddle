@@ -67,12 +67,13 @@ class Trainer(object):
         data_shape = [None, 3, 32, 32]
         images = fluid.data(name='pixel', shape=data_shape, dtype='float32')
 
-        if self.infer_network is 'resnet':
+        if self.infer_network == 'resnet':
             predict = resnet_cifar10(images, 32)
-        elif self.infer_network is 'vgg':
+        elif self.infer_network == 'vgg':
             predict = vgg_bn_drop(images)
         else:
             logging.error('The following inference network is not supported! Choose on of: resnet, vgg.')
+            sys.exit(1)
         return predict
 
 
@@ -153,6 +154,7 @@ class Trainer(object):
             feeder = fluid.DataFeeder(feed_list=feed_var_list_loop, place=place)
             exe.run(start_program)
 
+            print('Train started at {}'.format(train_start.strftime('%Y-%m-%d %H:%M:%S.%f')))            
             step = 0
             for pass_id in range(EPOCH_NUM):
                 for step_id, data_train in enumerate(train_reader()):
@@ -160,10 +162,10 @@ class Trainer(object):
                         main_program,
                         feed=feeder.feed(data_train),
                         fetch_list=[avg_cost, acc])
-                    if self.logger is not '' and self.logger is not None:
-                        self.train_cost.add_record(step_id, avg_loss_value[0])
-                        self.train_acc.add_record(step_id, avg_loss_value[1])
                     if step_id % 100 == 0:
+                        if self.logger is not '':
+                            self.train_cost.add_record(pass_id, avg_loss_value[0])
+                            self.train_acc.add_record(pass_id, avg_loss_value[1])
                         print("\nPass %d, Batch %d, Cost %f, Acc %f" % (
                             step_id, pass_id, avg_loss_value[0], avg_loss_value[1]))
                     else:
@@ -175,18 +177,19 @@ class Trainer(object):
                     test_program, reader=test_reader)
                 train_end = datetime.utcnow()
                 elapsed_time = train_end - train_start
-                if self.logger is not '' and self.logger is not None:
+                if self.logger is not '':
                     self.test_loss.add_record(pass_id, avg_cost_test)
                     self.test_acc.add_record(pass_id, accuracy_test)
                 print('\nTest with Pass {0}, Loss {1:2.2}, Acc {2:2.2}'.format(
                     pass_id, avg_cost_test, accuracy_test))
-                print('Train started at {}'.format(train_start.strftime('%Y-%m-%d %H:%M:%S.%f')))
-                print('Train ended at {}'.format(train_end.strftime('%Y-%m-%d %H:%M:%S.%f')))
-                print('Elapsed time for training is {}'.format(elapsed_time))
 
                 if params_dirname is not None:
                     fluid.io.save_inference_model(params_dirname, ["pixel"],
                                                   [predict], exe)
+
+                if pass_id == EPOCH_NUM -1:
+                    print('Train ended at {}'.format(train_end.strftime('%Y-%m-%d %H:%M:%S.%f')))
+                    print('Elapsed time for training is {}'.format(elapsed_time))
 
                 if self.enable_ce and pass_id == EPOCH_NUM - 1:
                     print("kpis\ttrain_cost\t%f" % avg_loss_value[0])
