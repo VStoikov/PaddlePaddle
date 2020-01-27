@@ -18,6 +18,7 @@ import sys
 from datetime import datetime
 from model.vgg import vgg_bn_drop
 from model.resnet import resnet_cifar10
+from module.env import dist_env
 
 class Trainer(object):
 
@@ -36,6 +37,11 @@ class Trainer(object):
             '-c', '--enable_ce', action='store_true', help='If set, run the task with continuous evaluation logs.')
         group.add_argument(
             '--logger', type=str, default='', help='Path to log data generated in deep learning tasks.')
+        group.add_argument(
+            '--cpu_num', type=int, default=1, help='Specify the number of the logic core.')
+        group.add_argument(
+            '--cuda_devices', type=int, default=1, help='Specify the number of the CUDA devices.')
+ 
         return group
 
     def __init__(self, hparams):
@@ -45,6 +51,7 @@ class Trainer(object):
         self.batch_size = hparams.batch_size
         self.enable_ce = hparams.enable_ce
         self.logger = hparams.logger
+        self.cpu_num = hparams.cpu_num
 
         if self.logger:
             from visualdl import LogWriter
@@ -90,6 +97,23 @@ class Trainer(object):
 
     def train(self, use_cuda, params_dirname):
         train_start = datetime.utcnow()
+
+        if use_cuda:
+            # NOTE: for multi process mode: one process per GPU device.
+            # For example: CUDA_VISIBLE_DEVICES="0,1,2,3".
+            os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_devices)
+            print("CUDA_VISIBLE_DEVICES:" + str(os.getenv("CPU_NUM")))
+        else:
+            # NOTE: If you use CPU to run the program, you need
+            # to specify the CPU_NUM, otherwise, fluid will use
+            # all the number of the logic core as the CPU_NUM,
+            # in that case, the batch size of the input should be
+            # greater than CPU_NUM, if not, the process will be
+            # failed by an exception.
+            if not use_cuda:
+                os.environ['CPU_NUM'] = str(self.cpu_num)
+                print("CPU_NUM:" + str(os.getenv("CPU_NUM")))
+
         place = fluid.CUDAPlace(0) if use_cuda else fluid.CPUPlace()
 
         if self.enable_ce:
@@ -154,6 +178,14 @@ class Trainer(object):
             feeder = fluid.DataFeeder(feed_list=feed_var_list_loop, place=place)
             exe.run(start_program)
 
+            # 1. MP mode, batch size for current process should be self.batch_size / GPUs
+            # 2. SP/PG mode, batch size for each process should be original self.batch_size
+            #if os.getenv("FLAGS_selected_gpus"):
+            #    steps_per_pass = images / (
+            #        self.batch_size / get_device_num()) / num_trainers
+            #else:
+            #    steps_per_pass = images / self.batch_size / num_trainers
+
             print('Train started at {}'.format(train_start.strftime('%Y-%m-%d %H:%M:%S.%f')))            
             step = 0
             for pass_id in range(EPOCH_NUM):
@@ -172,6 +204,8 @@ class Trainer(object):
                         sys.stdout.write('.')
                         sys.stdout.flush()
                     step += 1
+                    #if step >= steps_per_pass:
+                    #    break
 
                 avg_cost_test, accuracy_test = train_test(
                     test_program, reader=test_reader)

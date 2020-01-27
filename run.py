@@ -14,6 +14,7 @@ import os
 import sys
 import paddle.fluid as fluid
 from module.trainer import Trainer
+from module.env import dist_env
 
 def parse_args():
     parser = argparse.ArgumentParser("image_classification")
@@ -42,10 +43,19 @@ def parse_args():
 
     return args
 
+def print_paddle_envs():
+    print('----------- Configuration envs -----------')
+    for k in os.environ:
+        if "PADDLE_" in k:
+            print("ENV %s:%s" % (k, os.environ[k]))
+    print('------------------------------------------')
+
 def main(use_cuda):
     if use_cuda and not fluid.core.is_compiled_with_cuda():
         logging.warning('Your PC is not support CUDA!')
         return
+
+    print_paddle_envs()
 
     trainer = Trainer(args)
 
