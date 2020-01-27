@@ -41,6 +41,11 @@ class Trainer(object):
             '--cpu_num', type=int, default=1, help='Specify the number of the logic core.')
         group.add_argument(
             '--cuda_devices', type=int, default=1, help='Specify the number of the CUDA devices.')
+        group.add_argument(
+            '-m', '--multi_card', action='store_true', help='In the mode of multi graphics card training, all graphics card will be occupied.' +
+                                                            'If --use_cuda is false, the model will be run in CPU. In this situation, the multi-threads' + 
+                                                            'are used to run the model, and the number of threads is equal to the number of logic cores.' +
+                                                            'You can configure --cpu_num to change the number of threads that are being used.')
  
         return group
 
@@ -52,6 +57,7 @@ class Trainer(object):
         self.enable_ce = hparams.enable_ce
         self.logger = hparams.logger
         self.cpu_num = hparams.cpu_num
+        self.multi_card = hparams.multi_card
 
         if self.logger:
             from visualdl import LogWriter
@@ -102,7 +108,7 @@ class Trainer(object):
             # NOTE: for multi process mode: one process per GPU device.
             # For example: CUDA_VISIBLE_DEVICES="0,1,2,3".
             os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_devices)
-            print("CUDA_VISIBLE_DEVICES:" + str(os.getenv("CPU_NUM")))
+            print("CUDA_VISIBLE_DEVICES:" + str(os.getenv("CUDA_VISIBLE_DEVICES")))
         else:
             # NOTE: If you use CPU to run the program, you need
             # to specify the CPU_NUM, otherwise, fluid will use
@@ -160,10 +166,17 @@ class Trainer(object):
             test_exe = fluid.Executor(place)
             accumulated = len([avg_cost, acc]) * [0]
             for tid, test_data in enumerate(reader()):
-                avg_cost_np = test_exe.run(
-                    program=program,
-                    feed=feeder_test.feed(test_data),
-                    fetch_list=[avg_cost, acc])
+                if self.multi_card:
+                    compiled_prog = fluid.compiler.CompiledProgram(main_program)
+                    avg_cost_np = test_exe.run(
+                        program=program,
+                        feed=feeder_test.feed(test_data),
+                        fetch_list=[avg_cost, acc])
+                else:
+                    avg_cost_np = test_exe.run(
+                        program=program,
+                        feed=feeder_test.feed(test_data),
+                        fetch_list=[avg_cost, acc])
                 accumulated = [
                     x[0] + x[1][0] for x in zip(accumulated, avg_cost_np)
                 ]
@@ -190,10 +203,17 @@ class Trainer(object):
             step = 0
             for pass_id in range(EPOCH_NUM):
                 for step_id, data_train in enumerate(train_reader()):
-                    avg_loss_value = exe.run(
-                        main_program,
-                        feed=feeder.feed(data_train),
-                        fetch_list=[avg_cost, acc])
+                    if self.multi_card:
+                        compiled_prog = fluid.compiler.CompiledProgram(main_program)
+                        avg_loss_value = exe.run(
+                            compiled_prog,
+                            feed=feeder.feed(data_train),
+                            fetch_list=[avg_cost, acc])
+                    else:
+                        avg_loss_value = exe.run(
+                            main_program,
+                            feed=feeder.feed(data_train),
+                            fetch_list=[avg_cost, acc])
                     if step_id % 100 == 0:
                         if self.logger is not '':
                             self.train_cost.add_record(pass_id, avg_loss_value[0])
