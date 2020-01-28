@@ -40,7 +40,7 @@ class Trainer(object):
         group.add_argument(
             '--cpu_num', type=int, default=1, help='Specify the number of the logic core.')
         group.add_argument(
-            '--cuda_devices', type=int, default=1, help='Specify the number of the CUDA devices.')
+            '--cuda_devices', type=list, default=1, help='Specify the number of the CUDA devices.')
         group.add_argument(
             '-m', '--multi_card', action='store_true', help='In the mode of multi graphics card training, all graphics card will be occupied.' +
                                                             'If --use_cuda is false, the model will be run in CPU. In this situation, the multi-threads' + 
@@ -57,6 +57,7 @@ class Trainer(object):
         self.enable_ce = hparams.enable_ce
         self.logger = hparams.logger
         self.cpu_num = hparams.cpu_num
+        self.cuda_devices = hparams.cuda_devices
         self.multi_card = hparams.multi_card
 
         if self.logger:
@@ -107,8 +108,9 @@ class Trainer(object):
         if use_cuda:
             # NOTE: for multi process mode: one process per GPU device.
             # For example: CUDA_VISIBLE_DEVICES="0,1,2,3".
-            os.environ['CUDA_VISIBLE_DEVICES'] = str(self.cuda_devices)
-            print("CUDA_VISIBLE_DEVICES:" + str(os.getenv("CUDA_VISIBLE_DEVICES")))
+            # os.environ['CUDA_VISIBLE_DEVICES'] = self.cuda_devices
+            # print("CUDA_VISIBLE_DEVICES:" + str(os.getenv("CUDA_VISIBLE_DEVICES")))
+            pass
         else:
             # NOTE: If you use CPU to run the program, you need
             # to specify the CPU_NUM, otherwise, fluid will use

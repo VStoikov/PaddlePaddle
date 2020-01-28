@@ -55,7 +55,7 @@ def main(use_cuda):
         logging.warning('Your PC is not support CUDA!')
         return
 
-    print_paddle_envs()
+    #print_paddle_envs()
 
     trainer = Trainer(args)
 
