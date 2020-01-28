@@ -30,17 +30,17 @@ class Trainer(object):
         group.add_argument(
             '--infer_network', type=str, default='resnet', help="Set inference network. Default is Resnet. [resnet, vgg]")
         group.add_argument(
-            '--num_epochs', type=int, default=1, help='Number of epoch.')
+            '--num_epochs', type=int, default=1, help='Number of epoch. Default is 1.')
         group.add_argument(
-            '--batch_size', type=int, default=128, help="Batch size.")
+            '--batch_size', type=int, default=128, help="Batch size. Default is 128.")
         group.add_argument(
             '-c', '--enable_ce', action='store_true', help='If set, run the task with continuous evaluation logs.')
         group.add_argument(
             '--logger', type=str, default='', help='Path to log data generated in deep learning tasks.')
         group.add_argument(
-            '--cpu_num', type=int, default=1, help='Specify the number of the logic core.')
+            '--cpu_num', type=int, default=1, help='Specify the number of the logic core. Default is 1.')
         group.add_argument(
-            '--cuda_devices', type=list, default=1, help='Specify the number of the CUDA devices.')
+            '--cuda_devices', type=list, default=1, help='Specify the number of the CUDA devices. Default is 1.')
         group.add_argument(
             '-m', '--multi_card', action='store_true', help='In the mode of multi graphics card training, all graphics card will be occupied.' +
                                                             'If --use_cuda is false, the model will be run in CPU. In this situation, the multi-threads' + 
@@ -254,50 +254,3 @@ class Trainer(object):
                     print("kpis\ttest_acc\t%f" % accuracy_test)
 
         train_loop()
-
-    def infer(self, use_cuda, params_dirname, image):
-        from PIL import Image
-        place = fluid.CUDAPlace(0) if use_cuda else fluid.CPUPlace()
-        exe = fluid.Executor(place)
-        inference_scope = fluid.core.Scope()
-        image_path=image
-
-        def load_image(infer_file):
-            im = Image.open(infer_file)
-            im = im.resize((32, 32), Image.ANTIALIAS)
-
-            im = numpy.array(im).astype(numpy.float32)
-            # The storage order of the loaded image is W(width),
-            # H(height), C(channel). PaddlePaddle requires
-            # the CHW order, so transpose them.
-            im = im.transpose((2, 0, 1))  # CHW
-            im = im / 255.0
-
-            # Add one dimension to mimic the list format.
-            im = numpy.expand_dims(im, axis=0)
-            return im
-
-        img = load_image(image_path)
-
-        with fluid.scope_guard(inference_scope):
-            # Use fluid.io.load_inference_model to obtain the inference program desc,
-            # the feed_target_names (the names of variables that will be feeded
-            # data using feed operators), and the fetch_targets (variables that
-            # we want to obtain data from using fetch operators).
-            [inference_program, feed_target_names,
-             fetch_targets] = fluid.io.load_inference_model(params_dirname, exe)
-
-            # Construct feed as a dictionary of {feed_target_name: feed_target_data}
-            # and results will contain a list of data corresponding to fetch_targets.
-            results = exe.run(
-                inference_program,
-                feed={feed_target_names[0]: img},
-                fetch_list=fetch_targets)
-
-            # infer label
-            label_list = [
-                "airplane", "automobile", "bird", "cat", "deer", "dog", "frog",
-                "horse", "ship", "truck"
-            ]
-
-            print("infer results: %s" % label_list[numpy.argmax(results[0])])

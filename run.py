@@ -14,6 +14,7 @@ import os
 import sys
 import paddle.fluid as fluid
 from module.trainer import Trainer
+from module.infer import Infer
 from module.env import dist_env
 
 def parse_args():
@@ -32,9 +33,8 @@ def parse_args():
         '-g', '--use_cuda', 
         action='store_true', 
         help='Choose, if you want to run training with GPU performance.')
-    parser.add_argument(
-        '--image', type=str, default='', help='Path to image.')
     Trainer.add_cmdline_argument(parser)
+    Infer.add_cmdline_argument(parser)
     args = parser.parse_args()
 
     if len(sys.argv)<=1:
@@ -58,13 +58,12 @@ def main(use_cuda):
     #print_paddle_envs()
 
     trainer = Trainer(args)
+    infer = Infer(args)
 
     if args.train:
         trainer.train(use_cuda, args.model_path)
     elif args.infer:
-        cur_dir = os.path.dirname(os.path.realpath(__file__))
-        path = cur_dir + args.image
-        trainer.infer(use_cuda, args.model_path, path)
+        infer.infer(use_cuda, args.model_path)
     else:
         pass
 
