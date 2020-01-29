@@ -45,13 +45,13 @@ class Infer(object):
         self.labels_file = hparams.labels_file
         self.expected_result = hparams.expected_result
 
-        if self.image == '' and self.images == '':
-        	logging.warning('The following arguments are required: --image or --images')
-        	sys.exit(1)
+        #if self.image == '' and self.images == '':
+        #	logging.warning('The following arguments are required: --image or --images')
+        #	sys.exit(1)
 
-        if self.labels == '' and self.labels_file == '':
-        	logging.warning('The following arguments are required: --labels or --labels_file')
-        	sys.exit(1)
+        #if self.labels == '' and self.labels_file == '':
+        #	logging.warning('The following arguments are required: --labels or --labels_file')
+        #	sys.exit(1)
 
     def infer(self, use_cuda, params_dirname):
         from PIL import Image
