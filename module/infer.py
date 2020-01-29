@@ -34,8 +34,8 @@ class Infer(object):
         group.add_argument(
         	'--labels_file', type=str, default='', help='Path to labels file.')
         group.add_argument(
-        	'--expected_result', type=str, default='', required=True, help='Add the expected result of testing a set of images.')
-        
+        	'--expected_result', type=str, default='', help='Add the expected result of testing a set of images.')
+        # TODO debug command
         return group
 
     def __init__(self, hparams):
