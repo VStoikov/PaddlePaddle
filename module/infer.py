@@ -35,7 +35,10 @@ class Infer(object):
         	'--labels_file', type=str, default='', help='Path to labels file.')
         group.add_argument(
         	'--expected_result', type=str, default='', help='Add the expected result of testing a set of images.')
-        # TODO debug command
+        group.add_argument(
+        	'-r', '--moment_result',
+        	action='store_true',
+        	help="Print instant results.")
         return group
 
     def __init__(self, hparams):
@@ -44,6 +47,7 @@ class Infer(object):
         self.labels = hparams.labels
         self.labels_file = hparams.labels_file
         self.expected_result = hparams.expected_result
+        self.moment_result = hparams.moment_result
 
         #if self.image == '' and self.images == '':
         #	logging.warning('The following arguments are required: --image or --images')
@@ -112,7 +116,9 @@ class Infer(object):
 	                feed={feed_target_names[0]: img},
 	                fetch_list=fetch_targets)
 
-	            print("Infer results: {}	for {}".format(label_list[numpy.argmax(results[0])], image))
+	            if moment_result:
+	            	print("Infer results: {}	for {}".format(label_list[numpy.argmax(results[0])], image))
+
 	            if str(label_list[numpy.argmax(results[0])]) != self.expected_result:
 	            	mistakes += 1
 	            else:

@@ -16,8 +16,7 @@ import paddle.fluid as fluid
 import numpy
 import sys
 from datetime import datetime
-from model.vgg import vgg_bn_drop
-from model.resnet import resnet_cifar10
+from model import resnet_cifar10, vgg_bn_drop
 from module.env import dist_env
 
 class Trainer(object):
@@ -28,7 +27,7 @@ class Trainer(object):
         group = parser.add_argument_group("Trainer")
 
         group.add_argument(
-            '--infer_network', type=str, default='resnet', help="Set inference network. Default is Resnet. [resnet, vgg]")
+            '--infer_network', type=str, default='ResNet32', help="Set inference network. Default is ResNet32. [ResNet10, ResNet32, ResNet110, VGG]")
         group.add_argument(
             '--num_epochs', type=int, default=1, help='Number of epoch. Default is 1.')
         group.add_argument(
@@ -81,11 +80,16 @@ class Trainer(object):
         data_shape = [None, 3, 32, 32]
         images = fluid.data(name='pixel', shape=data_shape, dtype='float32')
 
-        if self.infer_network == 'resnet':
+        if self.infer_network == 'ResNet20':
+            predict = resnet_cifar10(images, 20)
+        elif self.infer_network == 'ResNet32':
             predict = resnet_cifar10(images, 32)
-        elif self.infer_network == 'vgg':
+        elif self.infer_network == 'ResNet110':
+            predict = resnet_cifar10(images, 110)
+        elif self.infer_network == 'VGG':
             predict = vgg_bn_drop(images)
         else:
+            #predict = NASCifarNet(images, 36, 6, 3, 10, Networks[self.infer_network], True)
             logging.error('The following inference network is not supported! Choose on of: resnet, vgg.')
             sys.exit(1)
         return predict
