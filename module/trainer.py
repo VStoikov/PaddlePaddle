@@ -89,7 +89,6 @@ class Trainer(object):
         elif self.infer_network == 'VGG':
             predict = vgg_bn_drop(images)
         else:
-            #predict = NASCifarNet(images, 36, 6, 3, 10, Networks[self.infer_network], True)
             logging.error('The following inference network is not supported! Choose on of: resnet, vgg.')
             sys.exit(1)
         return predict

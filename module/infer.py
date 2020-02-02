@@ -65,6 +65,7 @@ class Infer(object):
         image_path = self.images if self.images else str(self.image).rsplit('/', 1)[0]
         mistakes = 0
         hits = 0
+        img_errors = 0
 
         if self.labels_file:
         	try:
@@ -84,46 +85,57 @@ class Infer(object):
 	        images = {str(self.image).split('/')[-1]}
 
         def load_image(infer_file):
-            im = Image.open(infer_file)
-            im = im.resize((32, 32), Image.ANTIALIAS)
+        	try:
+	            im = Image.open(infer_file)
+	            im = im.resize((32, 32), Image.ANTIALIAS)
 
-            im = numpy.array(im).astype(numpy.float32)
-            # The storage order of the loaded image is W(width),
-            # H(height), C(channel). PaddlePaddle requires
-            # the CHW order, so transpose them.
-            im = im.transpose((2, 0, 1))  # CHW
-            im = im / 255.0
+	            im = numpy.array(im).astype(numpy.float32)
+	            # The storage order of the loaded image is W(width),
+	            # H(height), C(channel). PaddlePaddle requires
+	            # the CHW order, so transpose them.
+	            im = im.transpose((2, 0, 1))  # CHW
+	            im = im / 255.0
 
-            # Add one dimension to mimic the list format.
-            im = numpy.expand_dims(im, axis=0)
-            return im
+	            # Add one dimension to mimic the list format.
+	            im = numpy.expand_dims(im, axis=0)
+	            return im
+        	except Exception as e:
+	            logging.warning('Problem opening the file. Error: {} '.format(e))
+	            return False
 
         for image in images:
 	        img = load_image(image_path + '/' + image)
+	        if img is False:
+	        	img_errors += 1
+	        	pass
+	        else:
+		        with fluid.scope_guard(inference_scope):
+		            # Use fluid.io.load_inference_model to obtain the inference program desc,
+		            # the feed_target_names (the names of variables that will be feeded
+		            # data using feed operators), and the fetch_targets (variables that
+		            # we want to obtain data from using fetch operators).
+		            try:
+		            	[inference_program, feed_target_names,
+		             		fetch_targets] = fluid.io.load_inference_model(params_dirname, exe)
+		            except Exception as e:
+		            	logging.warning('Problem opening the model. Error: {} '.format(e))
+		            	sys.exit(1)
 
-	        with fluid.scope_guard(inference_scope):
-	            # Use fluid.io.load_inference_model to obtain the inference program desc,
-	            # the feed_target_names (the names of variables that will be feeded
-	            # data using feed operators), and the fetch_targets (variables that
-	            # we want to obtain data from using fetch operators).
-	            [inference_program, feed_target_names,
-	             fetch_targets] = fluid.io.load_inference_model(params_dirname, exe)
+		            # Construct feed as a dictionary of {feed_target_name: feed_target_data}
+		            # and results will contain a list of data corresponding to fetch_targets.
+		            results = exe.run(
+		                inference_program,
+		                feed={feed_target_names[0]: img},
+		                fetch_list=fetch_targets)
 
-	            # Construct feed as a dictionary of {feed_target_name: feed_target_data}
-	            # and results will contain a list of data corresponding to fetch_targets.
-	            results = exe.run(
-	                inference_program,
-	                feed={feed_target_names[0]: img},
-	                fetch_list=fetch_targets)
+		            if self.moment_result:
+		            	print("Infer results: {}	for {}".format(label_list[numpy.argmax(results[0])], image))
 
-	            if moment_result:
-	            	print("Infer results: {}	for {}".format(label_list[numpy.argmax(results[0])], image))
+		            if str(label_list[numpy.argmax(results[0])]) != self.expected_result:
+		            	mistakes += 1
+		            else:
+		            	hits += 1
 
-	            if str(label_list[numpy.argmax(results[0])]) != self.expected_result:
-	            	mistakes += 1
-	            else:
-	            	hits += 1
-
-        print("\nExpected result: {}\nTested images: {}".format(self.expected_result, len(images)))
-        print("Results:\n- the mistakes are {0}({1:.2f}%)".format(mistakes, (mistakes/len(images))*100))
-        print("- the hits are {0}({1:.2f}%)".format(hits, (hits/len(images))*100))
+        print("\nExpected result: {}\nTested images: {}".format(self.expected_result, len(images) - img_errors))
+        print("Results:\n- the mistakes are {0}({1:.2f}%)".format(mistakes, (mistakes/(len(images) - img_errors))*100))
+        print("- the hits are {0}({1:.2f}%)".format(hits, (hits/(len(images) - img_errors))*100))
