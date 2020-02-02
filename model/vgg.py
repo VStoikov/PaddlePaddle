@@ -17,7 +17,7 @@ from __future__ import print_function
 import paddle.fluid as fluid
 
 
-def vgg_bn_drop(input):
+def vgg_bn_drop(input, class_num):
     def conv_block(ipt, num_filter, groups, dropouts):
         return fluid.nets.img_conv_group(
             input=ipt,
@@ -41,5 +41,5 @@ def vgg_bn_drop(input):
     bn = fluid.layers.batch_norm(input=fc1, act='relu')
     drop2 = fluid.layers.dropout(x=bn, dropout_prob=0.5)
     fc2 = fluid.layers.fc(input=drop2, size=512, act=None)
-    predict = fluid.layers.fc(input=fc2, size=10, act='softmax')
+    predict = fluid.layers.fc(input=fc2, size=class_num, act='softmax')
     return predict

@@ -13,10 +13,10 @@
 # limitations under the License.
 
 from __future__ import print_function
-
+import paddle
 import paddle.fluid as fluid
 
-__all__ = ['resnet_cifar10']
+#__all__ = ['resnet_cifar10']
 
 
 def conv_bn_layer(input,
@@ -38,7 +38,19 @@ def conv_bn_layer(input,
 
 
 def shortcut(input, ch_in, ch_out, stride):
-    if ch_in != ch_out:
+    if stride == 2:
+        temp = fluid.layers.pool2d(
+            input, pool_size=2, pool_type='avg', pool_stride=2)
+        temp = fluid.layers.conv2d(
+            temp,
+            filter_size=1,
+            num_filters=ch_out,
+            stride=1,
+            padding=0,
+            act=None,
+            bias_attr=None)
+        return temp
+    elif ch_in != ch_out:
         return conv_bn_layer(input, ch_out, 1, stride, 0, None)
     else:
         return input
@@ -58,16 +70,16 @@ def layer_warp(block_func, input, ch_in, ch_out, count, stride):
     return tmp
 
 
-def resnet_cifar10(ipt, depth=32):
+def resnet_cifar10(ipt, depth, class_num):
     # depth should be one of 20, 32, 44, 56, 110, 1202
     assert (depth - 2) % 6 == 0
     n = (depth - 2) // 6
-    nStages = {16, 64, 128}
+#    nStages = {16, 64, 128}
     conv1 = conv_bn_layer(ipt, ch_out=16, filter_size=3, stride=1, padding=1)
     res1 = layer_warp(basicblock, conv1, 16, 16, n, 1)
     res2 = layer_warp(basicblock, res1, 16, 32, n, 2)
     res3 = layer_warp(basicblock, res2, 32, 64, n, 2)
     pool = fluid.layers.pool2d(
         input=res3, pool_size=8, pool_type='avg', pool_stride=1)
-    predict = fluid.layers.fc(input=pool, size=10, act='softmax')
+    predict = fluid.layers.fc(input=pool, size=class_num, act='softmax')
     return predict

@@ -29,6 +29,8 @@ class Trainer(object):
         group.add_argument(
             '--infer_network', type=str, default='ResNet32', help="Set inference network. Default is ResNet32. [ResNet10, ResNet32, ResNet110, VGG]")
         group.add_argument(
+            '--dataset', type=str, default='cifar-10', help='The dataset name. Default is cifar-10. [cifar-10, cifar-100]')
+        group.add_argument(
             '--num_epochs', type=int, default=1, help='Number of epoch. Default is 1.')
         group.add_argument(
             '--batch_size', type=int, default=128, help="Batch size. Default is 128.")
@@ -51,6 +53,7 @@ class Trainer(object):
     def __init__(self, hparams):
         # Use data distributed
         self.infer_network = hparams.infer_network
+        self.dataset = hparams.dataset
         self.num_epochs = hparams.num_epochs
         self.batch_size = hparams.batch_size
         self.enable_ce = hparams.enable_ce
@@ -58,6 +61,7 @@ class Trainer(object):
         self.cpu_num = hparams.cpu_num
         self.cuda_devices = hparams.cuda_devices
         self.multi_card = hparams.multi_card
+        self.num_class = 10 # default is cifar-10
 
         if self.logger:
             from visualdl import LogWriter
@@ -72,6 +76,9 @@ class Trainer(object):
                 self.test_loss = logger.scalar("loss")
                 self.test_acc = logger.scalar("acc")
 
+        if self.dataset is "cifar-100":
+            self.num_class = 100
+
         #if not os.path.exists(self.save_dir):
         #    os.makedirs(self.save_dir)
 
@@ -81,13 +88,13 @@ class Trainer(object):
         images = fluid.data(name='pixel', shape=data_shape, dtype='float32')
 
         if self.infer_network == 'ResNet20':
-            predict = resnet_cifar10(images, 20)
+            predict = resnet_cifar10(images, 20, self.num_class)
         elif self.infer_network == 'ResNet32':
-            predict = resnet_cifar10(images, 32)
+            predict = resnet_cifar10(images, 32, self.num_class)
         elif self.infer_network == 'ResNet110':
-            predict = resnet_cifar10(images, 110)
+            predict = resnet_cifar10(images, 110, self.num_class)
         elif self.infer_network == 'VGG':
-            predict = vgg_bn_drop(images)
+            predict = vgg_bn_drop(images, self.num_class)
         else:
             logging.error('The following inference network is not supported! Choose on of: resnet, vgg.')
             sys.exit(1)
